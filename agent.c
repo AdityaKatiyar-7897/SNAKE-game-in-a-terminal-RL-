@@ -48,5 +48,5 @@ void train(Agent *agent){
 		float error = target - agent->net.output[exp->action];
 		agent->net.output[exp->action] += agent->learning_rate * error;
 		}
-    if (agent->epsilon > 0.1f) agent->epsilon -= 0.001f;
+    if (agent->epsilon > 0.1f) agent->epsilon -= 0.0001f;
 }
