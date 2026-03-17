@@ -18,5 +18,9 @@ typedef struct{
 void init_network(NeuralNet *net);
 void forward(NeuralNet *net, float inputs[INPUT_SIZE]);
 int get_action(NeuralNet *net);
+void backward(NeuralNet *net, float inputs[], float target[], float learning_rate);
+
+void save_network(NeuralNet *net, const char *filename);
+void load_network(NeuralNet *net, const char *filename);
 
 #endif

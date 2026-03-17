@@ -33,20 +33,31 @@ int agent_action(Agent *agent, float inputs[]) {
     return get_action(&agent->net);
 }
 
-void train(Agent *agent){
-	if (agent->memory.size <32) return;
+void train(Agent *agent) {
+    if (agent->memory.size < 32) return;
 
-	for (int b = 0; b < 32 ; b++){
-		int idx = rand() % agent->memory.size;
-		Experience *exp = &agent->memory.arr[idx];
+    for (int b = 0; b < 32; b++) {
+        int idx = rand() % agent->memory.size;
+        Experience *exp = &agent->memory.arr[idx];
 
-		forward(&agent->net, exp->next_inputs);
-		float max_next = agent->net.output[get_action(&agent->net)];
-		float target = exp->reward + (exp->done ? 0.0f : 0.99f * max_next);
-		
-		forward(&agent->net, exp->inputs);
-		float error = target - agent->net.output[exp->action];
-		agent->net.output[exp->action] += agent->learning_rate * error;
-		}
+        // Get target values
+        forward(&agent->net, exp->next_inputs);
+        float max_next = agent->net.output[get_action(&agent->net)];
+        float target[OUTPUT_SIZE];
+
+        // First run forward on current inputs
+        forward(&agent->net, exp->inputs);
+
+        // Copy current outputs as targets
+        for (int i = 0; i < OUTPUT_SIZE; i++)
+            target[i] = agent->net.output[i];
+
+        // Only update the action that was taken
+        target[exp->action] = exp->reward + (exp->done ? 0.0f : 0.99f * max_next);
+
+        // Now do real backprop
+        backward(&agent->net, exp->inputs, target, agent->learning_rate);
+    }
+
     if (agent->epsilon > 0.1f) agent->epsilon -= 0.0001f;
 }

@@ -3,11 +3,11 @@
 #include <unistd.h>
 #include "game.h"
 #include "neural_net.h"
+#include "agent.h"
 #include "terminal.h"
 
-void draw(GameState *state, int generation, int score) {
+void draw(GameState *state, int generation, float epsilon, int best_score) {
     clear_screen();
-
     printf("+");
     for (int j = 0; j < GRID_WIDTH; j++) printf("-");
     printf("+\n");
@@ -25,29 +25,32 @@ void draw(GameState *state, int generation, int score) {
     printf("+");
     for (int j = 0; j < GRID_WIDTH; j++) printf("-");
     printf("+\n");
-
-    printf("Generation: %d | Score: %d\n", generation, score);
+    printf("Generation: %d | Score: %d | Best: %d | Epsilon: %.2f\n",
+           generation, state->score, best_score, epsilon);
 }
 
 int main() {
     srand(42);
 
-    NeuralNet net;
-    init_network(&net);
+    Agent agent;
+    init_agent(&agent);
+    load_network(&agent.net, "snake_brain.bin");
 
     int generation = 1;
+    int best_score = 0;
 
     while (1) {
         GameState state;
         init_game(&state);
 
+        float inputs[INPUT_SIZE];
+        float next_inputs[INPUT_SIZE];
         int steps = 0;
+        int last_score = 0;
 
-        while (state.alive && steps < 200) {
-            float inputs[INPUT_SIZE];
+        while (state.alive && steps < 2000) {
             get_inputs(&state, inputs);
-            forward(&net, inputs);
-            int action = get_action(&net);
+            int action = agent_action(&agent, inputs);
 
             if (action == 0) state.snake.direction = UP;
             if (action == 1) state.snake.direction = DOWN;
@@ -55,10 +58,32 @@ int main() {
             if (action == 3) state.snake.direction = RIGHT;
 
             update_game(&state);
-            draw(&state, generation, state.score);
-            usleep(100000);
+            get_inputs(&state, next_inputs);
+
+            float reward = 0;
+            if (!state.alive)                  reward = -10.0f;
+            else if (state.score > last_score) reward = 10.0f;
+            else                               reward = -0.01f;
+
+            remember(&agent, inputs, action, reward, next_inputs, !state.alive);
+            train(&agent);
+
+            last_score = state.score;
             steps++;
+
+            if (generation % 500 == 0) {
+                draw(&state, generation, agent.epsilon, best_score);
+                usleep(50000);
+            }
         }
+
+        if (state.score > best_score) best_score = state.score;
+
+        printf("Gen %d done | Score: %d | Best: %d | Epsilon: %.2f\n",
+               generation, state.score, best_score, agent.epsilon);
+
+        if (generation % 100 == 0)
+            save_network(&agent.net, "snake_brain.bin");
 
         generation++;
     }
